@@ -88,3 +88,64 @@ def user_in_policy_scope(user_id, policy):
     # Note: group-based include/exclude requires resolving group membership,
     # which needs GroupMember.Read.All. Left as a documented gap below.
     return False
+
+def build_report(mfa_records, policies, known):
+    enabled_mfa_policies = [
+        p for p in policies if p.get("state") == "enabled" and policy_requires_mfa(p)
+    ]
+    reportonly_mfa_policies = [
+        p for p in policies
+        if p.get("state") == "enabledForReportingButNotEnforced" and policy_requires_mfa(p)
+    ]
+    legacy_auth_open = not any(
+        p.get("state") == "enabled" and policy_blocks_legacy_auth(p) for p in policies
+    )
+ 
+    rows = []
+    for u in mfa_records:
+        user_id = u.get("id")
+        upn = (u.get("userPrincipalName") or "").lower()
+        is_admin = u.get("isAdmin", False)
+        mfa_registered = u.get("isMfaRegistered", False)
+ 
+        covered_enforced = any(user_in_policy_scope(user_id, p) for p in enabled_mfa_policies)
+        covered_reportonly = any(user_in_policy_scope(user_id, p) for p in reportonly_mfa_policies)
+ 
+        label = None
+        if upn in known["break_glass_accounts"]:
+            label = "break_glass"
+        elif upn in known["service_accounts"]:
+            label = "service_account"
+ 
+        # Determine flag
+        if label == "break_glass":
+            flag = "INFO"
+            reason = "Known break-glass account — expected to bypass MFA/CA by design."
+        elif not mfa_registered and not covered_enforced:
+            flag = "RED"
+            reason = "No MFA registered AND not covered by any enforced CA policy requiring MFA."
+        elif not covered_enforced and covered_reportonly:
+            flag = "YELLOW"
+            reason = "Only covered by a report-only CA policy — MFA not actually enforced yet."
+        elif not covered_enforced:
+            flag = "YELLOW"
+            reason = "MFA registered but no enforced CA policy actually requires it for this user."
+        elif not mfa_registered:
+            flag = "YELLOW"
+            reason = "Covered by an enforcing CA policy, but user hasn't completed MFA registration."
+        else:
+            flag = "GREEN"
+            reason = "MFA registered and enforced via Conditional Access."
+ 
+        rows.append({
+            "userPrincipalName": u.get("userPrincipalName"),
+            "isAdmin": is_admin,
+            "accountLabel": label or ("unclassified" if flag != "GREEN" else ""),
+            "mfaRegistered": mfa_registered,
+            "coveredByEnforcedCA": covered_enforced,
+            "coveredByReportOnlyCA": covered_reportonly,
+            "flag": flag,
+            "reason": reason,
+        })
+ 
+    return rows, legacy_auth_open
