@@ -54,3 +54,11 @@ def load_known_accounts():
         "break_glass_accounts": {u.lower() for u in data.get("break_glass_accounts", [])},
         "service_accounts": {u.lower() for u in data.get("service_accounts", [])},
     }
+
+def fetch_mfa_registration(headers):
+    url = f"{GRAPH_BASE}/reports/authenticationMethods/userRegistrationDetails"
+    return graph_get_all(url, headers)
+
+def fetch_ca_policies(headers):
+    url = f"{GRAPH_BASE}/identity/conditionalAccess/policies"
+    return graph_get_all(url, headers)
