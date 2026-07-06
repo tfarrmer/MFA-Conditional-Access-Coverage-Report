@@ -1,0 +1,10 @@
+{
+  "_comment": "Copy this file to known_accounts.json and fill in real UPNs. This file is gitignored since it names real accounts.",
+  "break_glass_accounts": [
+    "emergency-admin@yourtenant.onmicrosoft.com"
+  ],
+  "service_accounts": [
+    "svc-backup@yourtenant.onmicrosoft.com",
+    "svc-monitoring@yourtenant.onmicrosoft.com"
+  ]
+}

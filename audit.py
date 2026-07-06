@@ -212,7 +212,7 @@ def rank_remediation(rows, legacy_auth_open):
  
 def write_xlsx(rows, remediation, out_path):
     wb = Workbook()
- 
+
     ws1 = wb.active
     ws1.title = "Coverage Heatmap"
     headers = ["User", "Admin?", "Label", "MFA Registered", "Enforced CA Coverage",
@@ -220,27 +220,27 @@ def write_xlsx(rows, remediation, out_path):
     ws1.append(headers)
     for cell in ws1[1]:
         cell.font = Font(bold=True)
- 
+
     fill = {
         "RED": PatternFill(start_color="F4CCCC", end_color="F4CCCC", fill_type="solid"),
         "YELLOW": PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid"),
         "GREEN": PatternFill(start_color="D9EAD3", end_color="D9EAD3", fill_type="solid"),
         "INFO": PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid"),
     }
- 
+
     for r in sorted(rows, key=lambda x: {"RED": 0, "YELLOW": 1, "INFO": 2, "GREEN": 3}[x["flag"]]):
         ws1.append([
             r["userPrincipalName"], r["isAdmin"], r["accountLabel"], r["mfaRegistered"],
             r["coveredByEnforcedCA"], r["coveredByReportOnlyCA"], r["flag"], r["reason"],
         ])
         ws1.cell(row=ws1.max_row, column=7).fill = fill[r["flag"]]
- 
+
     for col in ws1.columns:
         length = max(len(str(c.value)) for c in col if c.value is not None)
         ws1.column_dimensions[col[0].column_letter].width = min(length + 2, 50)
- 
+
     ws2 = wb.create_sheet("Remediation List")
-    ws2.append(["Priority", "Category", "Count", "Action", "Example Accounts"])
+    ws2.append(["Priority", "Category", "Count", "Action", "Example Accounts (see Full Account Lists tab)"])
     for cell in ws2[1]:
         cell.font = Font(bold=True)
     for item in remediation:
@@ -251,7 +251,18 @@ def write_xlsx(rows, remediation, out_path):
     for col in ws2.columns:
         length = max(len(str(c.value)) for c in col if c.value is not None)
         ws2.column_dimensions[col[0].column_letter].width = min(length + 2, 60)
- 
+
+    ws3 = wb.create_sheet("Full Account Lists")
+    ws3.append(["Priority", "Category", "Account"])
+    for cell in ws3[1]:
+        cell.font = Font(bold=True)
+    for item in remediation:
+        for account in item["accounts"]:
+            ws3.append([item["priority"], item["category"], account])
+    for col in ws3.columns:
+        length = max(len(str(c.value)) for c in col if c.value is not None)
+        ws3.column_dimensions[col[0].column_letter].width = min(length + 2, 50)
+
     wb.save(out_path)
 
 

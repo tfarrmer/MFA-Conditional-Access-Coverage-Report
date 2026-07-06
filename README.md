@@ -7,8 +7,12 @@ Red/Yellow/Green heatmap plus a prioritized remediation list.
 ## Setup
 
 1. **Register an Azure AD App** (Entra admin center → App registrations → New registration)
-   - Add **Application permissions** (not delegated): `Reports.Read.All`, `Policy.Read.All`, `Directory.Read.All`
-   - Have a Global Admin/Privileged Role Admin grant admin consent
+   - Add **Application permissions** (not delegated): `Reports.Read.All`, `AuditLog.Read.All`, `Policy.Read.All`, `Directory.Read.All`
+     - Note: Microsoft's docs list `Reports.Read.All` as sufficient for the MFA
+       registration report, but in practice the API also requires `AuditLog.Read.All`
+       to be granted — without it you'll get a 403 with the error code
+       `Authentication_MSGraphPermissionMissing`.
+   - Have a Global Admin/Privileged Role Admin grant admin consent for all four permissions
    - Create a client secret under Certificates & secrets
 
 2. **Clone this repo and configure secrets locally**
@@ -18,7 +22,11 @@ Red/Yellow/Green heatmap plus a prioritized remediation list.
    ```
    `.env` is gitignored — it will never be committed.
 
-3. **Label your break-glass and service accounts**
+3. **(Optional) Label your break-glass and service accounts**
+   This step isn't required — the script runs fully without it. Only do this
+   if you want to narrow down the "unclassified" list to just genuinely
+   unknown accounts, instead of manually checking every excluded account
+   yourself in the report.
    ```bash
    cp known_accounts.json.example known_accounts.json
    # edit known_accounts.json with real UPNs of known break-glass/service accounts
@@ -48,6 +56,34 @@ Red/Yellow/Green heatmap plus a prioritized remediation list.
   break-glass/service accounts; anything excluded and *not* labeled shows
   up as "unclassified — verify"
 
+## Understanding the report output
+
+The generated `.xlsx` has three tabs:
+
+- **Coverage Heatmap** — one row per user, color-coded RED/YELLOW/GREEN/INFO,
+  sorted worst-to-best
+- **Remediation List** — one row per risk category, ranked by priority, with
+  up to 5 example accounts per category
+- **Full Account Lists** — every account in every category, in full, with no
+  truncation (use this if a category's account list is longer than the 5
+  examples shown on the Remediation List tab)
+
+### Remediation priority meanings
+
+Priority numbers run from 1 (most urgent) to 5 (least urgent). A priority
+only appears in the report if at least one account actually falls into that
+category — if a category is empty, it's simply omitted rather than shown as
+a zero-count row. So it's normal and expected to see priorities skip
+numbers (e.g. only 2, 3, and 5 appearing, with 1 and 4 absent).
+
+| Priority | Category | Meaning |
+|---|---|---|
+| 1 | Privileged accounts with no protection | Admin accounts with no MFA registered AND no enforced CA policy covering them — highest risk |
+| 2 | Users with zero CA/MFA coverage | Non-admin accounts with no MFA registered AND no enforced CA policy covering them |
+| 3 | Legacy authentication not blocked | No enabled CA policy blocks legacy auth protocols tenant-wide |
+| 4 | Policies in report-only mode | Accounts only covered by a CA policy that's in test/report-only mode, not actually enforcing |
+| 5 | Unclassified excluded/unprotected accounts | Accounts excluded from CA policies that aren't labeled as known break-glass/service accounts in `known_accounts.json` — needs manual review |
+
 ## Known limitation
 
 CA policy scoping in this script only resolves **direct user includes/excludes**
@@ -65,3 +101,5 @@ protection. Flagging this as a documented next step rather than a silent gap.
 - `output/` holds real user data in the generated reports — never committed
 - Only the `.example` versions of the above are tracked in git, so anyone
   cloning this repo gets the structure without any real tenant data
+
+Author: Travis Farmer | Computer Science Major @ Georgia State University | IT Intern @ Axion BioSystems
