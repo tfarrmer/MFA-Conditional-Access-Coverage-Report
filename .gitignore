@@ -1,0 +1,30 @@
+# Secrets - NEVER commit these
+.env
+*.env
+.env.*
+!.env.example
+
+# Credentials / tokens
+*.pem
+*.key
+*.pfx
+token_cache.bin
+
+# Output reports (contain real tenant user data)
+output/
+*.csv
+*.xlsx
+reports/
+
+# Real account labels (names real tenant accounts)
+known_accounts.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS junk
+.DS_Store
+Thumbs.db
