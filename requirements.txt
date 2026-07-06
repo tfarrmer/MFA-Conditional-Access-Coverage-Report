@@ -1,0 +1,5 @@
+#defines what python libraries the tool depends on
+
+requests==2.32.3
+python-dotenv==1.0.1
+openpyxl==3.1.5
