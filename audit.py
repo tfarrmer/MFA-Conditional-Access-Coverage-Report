@@ -251,3 +251,38 @@ def write_xlsx(rows, remediation, out_path):
         ws2.column_dimensions[col[0].column_letter].width = min(length + 2, 60)
  
     wb.save(out_path)
+
+
+def main():
+    print("Authenticating...")
+    token = get_access_token()
+    headers = {"Authorization": f"Bearer {token}"}
+ 
+    print("Fetching MFA registration details...")
+    mfa_records = fetch_mfa_registration(headers)
+    print(f"  -> {len(mfa_records)} users")
+ 
+    print("Fetching Conditional Access policies...")
+    policies = fetch_ca_policies(headers)
+    print(f"  -> {len(policies)} policies")
+ 
+    known = load_known_accounts()
+ 
+    print("Building coverage report...")
+    rows, legacy_auth_open = build_report(mfa_records, policies, known)
+    remediation = rank_remediation(rows, legacy_auth_open)
+ 
+    os.makedirs("output", exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = f"output/mfa_ca_coverage_report_{timestamp}.xlsx"
+    write_xlsx(rows, remediation, out_path)
+ 
+    red = sum(1 for r in rows if r["flag"] == "RED")
+    yellow = sum(1 for r in rows if r["flag"] == "YELLOW")
+    green = sum(1 for r in rows if r["flag"] == "GREEN")
+    print(f"\nDone. Red: {red}  Yellow: {yellow}  Green: {green}")
+    print(f"Report saved to {out_path}")
+ 
+ 
+if __name__ == "__main__":
+    main()
