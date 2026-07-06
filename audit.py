@@ -149,3 +149,105 @@ def build_report(mfa_records, policies, known):
         })
  
     return rows, legacy_auth_open
+
+def rank_remediation(rows, legacy_auth_open):
+    """Produce a prioritized action list."""
+    items = []
+ 
+    admins_no_mfa = [r for r in rows if r["isAdmin"] and r["flag"] == "RED"]
+    if admins_no_mfa:
+        items.append({
+            "priority": 1,
+            "category": "Privileged accounts with no protection",
+            "count": len(admins_no_mfa),
+            "accounts": [r["userPrincipalName"] for r in admins_no_mfa],
+            "action": "Enforce MFA immediately via Conditional Access for these admin accounts.",
+        })
+ 
+    zero_coverage = [r for r in rows if r["flag"] == "RED" and not r["isAdmin"]]
+    if zero_coverage:
+        items.append({
+            "priority": 2,
+            "category": "Users with zero CA/MFA coverage",
+            "count": len(zero_coverage),
+            "accounts": [r["userPrincipalName"] for r in zero_coverage],
+            "action": "Add these users to an enforced CA policy requiring MFA.",
+        })
+ 
+    if legacy_auth_open:
+        items.append({
+            "priority": 3,
+            "category": "Legacy authentication not blocked",
+            "count": None,
+            "accounts": [],
+            "action": "No enabled CA policy blocks legacy auth protocols (exchangeActiveSync/other). "
+                       "Create/enable a policy to block legacy auth tenant-wide.",
+        })
+ 
+    report_only = [r for r in rows if r["flag"] == "YELLOW" and r["coveredByReportOnlyCA"]]
+    if report_only:
+        items.append({
+            "priority": 4,
+            "category": "Policies in report-only mode",
+            "count": len(report_only),
+            "accounts": [r["userPrincipalName"] for r in report_only],
+            "action": "Review report-only CA policies and switch to Enabled once validated.",
+        })
+ 
+    unclassified = [r for r in rows if r["accountLabel"] == "unclassified"]
+    if unclassified:
+        items.append({
+            "priority": 5,
+            "category": "Unclassified excluded/unprotected accounts",
+            "count": len(unclassified),
+            "accounts": [r["userPrincipalName"] for r in unclassified],
+            "action": "Verify whether these are legitimate service/break-glass accounts. "
+                       "Add confirmed ones to known_accounts.json.",
+        })
+ 
+    return items
+ 
+ 
+def write_xlsx(rows, remediation, out_path):
+    wb = Workbook()
+ 
+    ws1 = wb.active
+    ws1.title = "Coverage Heatmap"
+    headers = ["User", "Admin?", "Label", "MFA Registered", "Enforced CA Coverage",
+               "Report-Only CA Coverage", "Flag", "Reason"]
+    ws1.append(headers)
+    for cell in ws1[1]:
+        cell.font = Font(bold=True)
+ 
+    fill = {
+        "RED": PatternFill(start_color="F4CCCC", end_color="F4CCCC", fill_type="solid"),
+        "YELLOW": PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid"),
+        "GREEN": PatternFill(start_color="D9EAD3", end_color="D9EAD3", fill_type="solid"),
+        "INFO": PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid"),
+    }
+ 
+    for r in sorted(rows, key=lambda x: {"RED": 0, "YELLOW": 1, "INFO": 2, "GREEN": 3}[x["flag"]]):
+        ws1.append([
+            r["userPrincipalName"], r["isAdmin"], r["accountLabel"], r["mfaRegistered"],
+            r["coveredByEnforcedCA"], r["coveredByReportOnlyCA"], r["flag"], r["reason"],
+        ])
+        ws1.cell(row=ws1.max_row, column=7).fill = fill[r["flag"]]
+ 
+    for col in ws1.columns:
+        length = max(len(str(c.value)) for c in col if c.value is not None)
+        ws1.column_dimensions[col[0].column_letter].width = min(length + 2, 50)
+ 
+    ws2 = wb.create_sheet("Remediation List")
+    ws2.append(["Priority", "Category", "Count", "Action", "Example Accounts"])
+    for cell in ws2[1]:
+        cell.font = Font(bold=True)
+    for item in remediation:
+        ws2.append([
+            item["priority"], item["category"], item["count"] or "-",
+            item["action"], ", ".join(item["accounts"][:5]) + ("..." if len(item["accounts"]) > 5 else ""),
+        ])
+    for col in ws2.columns:
+        length = max(len(str(c.value)) for c in col if c.value is not None)
+        ws2.column_dimensions[col[0].column_letter].width = min(length + 2, 60)
+ 
+    wb.save(out_path)
