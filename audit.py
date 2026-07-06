@@ -62,3 +62,29 @@ def fetch_mfa_registration(headers):
 def fetch_ca_policies(headers):
     url = f"{GRAPH_BASE}/identity/conditionalAccess/policies"
     return graph_get_all(url, headers)
+
+def policy_requires_mfa(policy):
+    controls = policy.get("grantControls") or {}
+    return "mfa" in (controls.get("builtInControls") or [])
+ 
+ 
+def policy_blocks_legacy_auth(policy):
+    client_types = set((policy.get("conditions") or {}).get("clientAppTypes") or [])
+    grant = policy.get("grantControls") or {}
+    is_block = grant.get("operator") == "OR" and "block" in (grant.get("builtInControls") or [])
+    return is_block and bool(client_types & LEGACY_AUTH_CLIENT_TYPES)
+ 
+ 
+def user_in_policy_scope(user_id, policy):
+    """Rough scope check: included (all users, or explicit id) minus excluded."""
+    users_cond = (policy.get("conditions") or {}).get("users") or {}
+    include_users = set(users_cond.get("includeUsers") or [])
+    exclude_users = set(users_cond.get("excludeUsers") or [])
+ 
+    if user_id in exclude_users:
+        return False
+    if "All" in include_users or user_id in include_users:
+        return True
+    # Note: group-based include/exclude requires resolving group membership,
+    # which needs GroupMember.Read.All. Left as a documented gap below.
+    return False
