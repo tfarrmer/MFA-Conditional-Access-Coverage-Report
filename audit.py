@@ -41,3 +41,16 @@ def graph_get_all(url, headers):
         results.extend(body.get("value", []))
         url = body.get("@odata.nextLink")
     return results
+
+def load_known_accounts():
+    path = "known_accounts.json"
+    if not os.path.exists(path):
+        print(f"[warn] {path} not found — break-glass/service accounts won't be labeled. "
+              f"Copy known_accounts.json.example to get started.")
+        return {"break_glass_accounts": [], "service_accounts": []}
+    with open(path) as f:
+        data = json.load(f)
+    return {
+        "break_glass_accounts": {u.lower() for u in data.get("break_glass_accounts", [])},
+        "service_accounts": {u.lower() for u in data.get("service_accounts", [])},
+    }
