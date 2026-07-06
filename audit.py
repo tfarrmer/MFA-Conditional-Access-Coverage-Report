@@ -36,6 +36,8 @@ def graph_get_all(url, headers):
     results = []
     while url:
         resp = requests.get(url, headers=headers)
+        if resp.status_code >= 400:
+            print("ERROR RESPONSE BODY:", resp.text)
         resp.raise_for_status()
         body = resp.json()
         results.extend(body.get("value", []))
