@@ -61,6 +61,8 @@ Red/Yellow/Green heatmap plus a prioritized remediation list.
 The generated `.xlsx` has three tabs:
 
 ![Sample report output](updated.png)
+![Sample report output](updated2.png)
+
 
 - **Coverage Heatmap** — one row per user, color-coded RED/YELLOW/GREEN/INFO,
   sorted worst-to-best
