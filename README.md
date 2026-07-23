@@ -52,17 +52,16 @@ Red/Yellow/Green heatmap plus a prioritized remediation list.
   requiring MFA, vs. only a report-only policy, vs. no policy at all
 - **Legacy auth** — whether any enabled policy actually blocks legacy auth
   client types (`exchangeActiveSync`, `other`)
-- **Exclusions** — cross-references excluded users against your labeled
-  break-glass/service accounts; anything excluded and *not* labeled shows
+- **Labeling** — cross-references every non-GREEN (RED/YELLOW) user against
+  your labeled break-glass/service accounts; anything not labeled shows
   up as "unclassified — verify"
 
 ## Understanding the report output
 
 The generated `.xlsx` has three tabs:
 
-![Sample report output](updated.png)
-![Sample report output](updated2.png)
-
+![Coverage Heatmap sample](updated.png)
+![Remediation List sample](updated2.png)
 
 - **Coverage Heatmap** — one row per user, color-coded RED/YELLOW/GREEN/INFO,
   sorted worst-to-best
@@ -86,7 +85,7 @@ numbers (e.g. only 2, 3, and 5 appearing, with 1 and 4 absent).
 | 2 | Users with zero CA/MFA coverage | Non-admin accounts with no MFA registered AND no enforced CA policy covering them |
 | 3 | Legacy authentication not blocked | No enabled CA policy blocks legacy auth protocols tenant-wide |
 | 4 | Policies in report-only mode | Accounts only covered by a CA policy that's in test/report-only mode, not actually enforcing |
-| 5 | Unclassified excluded/unprotected accounts | Accounts excluded from CA policies that aren't labeled as known break-glass/service accounts in `known_accounts.json` — needs manual review |
+| 5 | Unclassified non-GREEN accounts | Any RED or YELLOW account not labeled as a known break-glass/service account in `known_accounts.json` — needs manual review. Overlaps with priorities 1, 2, and 4, since it isn't filtered by exclusion status |
 
 ## Known limitation
 
